@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1A3A5C">
+<title>Finanzas Mathi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #F0F4F8;
+    color: #1A1A1A;
+    min-height: 100vh;
+    padding-bottom: 2rem;
+  }
+
+  .header {
+    background: #1A3A5C;
+    color: white;
+    padding: 1.25rem 1.25rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-title { font-size: 11px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+  .header-month { font-size: 22px; font-weight: 600; }
+  .header-update { font-size: 11px; opacity: 0.5; margin-top: 4px; }
+  .refresh-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .refresh-btn:active { background: rgba(255,255,255,0.25); }
+
+  .content { padding: 1rem; }
+
+  /* Métricas principales */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+  .metric {
+    background: white;
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .metric-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .metric-value { font-size: 19px; font-weight: 600; line-height: 1.1; }
+  .metric-value.blue { color: #1A3A5C; }
+  .metric-value.red { color: #C0392B; }
+  .metric-value.green { color: #0F6E56; }
+  .metric-value.orange { color: #B7600A; }
+  .metric-sub { font-size: 11px; color: #999; margin-top: 3px; }
+
+  /* Barra de progreso Santander */
+  .santander-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 1rem;
+  }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+  .card-title { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
+  .card-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-ok { background: #E1F5EE; color: #0F6E56; }
+  .badge-warn { background: #FFF3E0; color: #B7600A; }
+  .badge-danger { background: #FDECEA; color: #C0392B; }
+
+  .progress-main {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .progress-spent { font-size: 26px; font-weight: 700; color: #1A3A5C; }
+  .progress-total { font-size: 13px; color: #999; }
+  .progress-bar-bg {
+    height: 8px; background: #F0F4F8; border-radius: 4px; overflow: hidden; margin-bottom: 6px;
+  }
+  .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+  .progress-fill-ok { background: #1A3A5C; }
+  .progress-fill-warn { background: #E67E22; }
+  .progress-fill-danger { background: #C0392B; }
+  .progress-info { display: flex; justify-content: space-between; font-size: 11px; color: #999; }
+
+  /* Alertas */
+  .alerta {
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 0.6rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .alerta-warn { background: #FFF3E0; color: #B7600A; }
+  .alerta-danger { background: #FDECEA; color: #C0392B; }
+  .alerta-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Card genérica */
+  .card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 1rem;
+  }
+
+  /* Categorías */
+  .cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cat-row:last-child { margin-bottom: 0; }
+  .cat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .cat-info { flex: 1; min-width: 0; }
+  .cat-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cat-bar-bg { height: 4px; background: #F0F4F8; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .cat-bar-fill { height: 100%; border-radius: 2px; }
+  .cat-amount { font-size: 13px; font-weight: 600; color: #1A3A5C; flex-shrink: 0; }
+
+  /* Últimos movimientos */
+  .tx-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0;
+    border-bottom: 0.5px solid #F0F4F8;
+  }
+  .tx-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .tx-left { flex: 1; min-width: 0; margin-right: 12px; }
+  .tx-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tx-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .tx-date { font-size: 11px; color: #999; }
+  .tx-badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .tx-amount { font-size: 14px; font-weight: 600; color: #C0392B; flex-shrink: 0; }
+
+  /* BROU */
+  .brou-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 0.5px solid #F0F4F8; }
+  .brou-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .brou-label { font-size: 13px; color: #555; }
+  .brou-amount { font-size: 13px; font-weight: 600; color: #1A3A5C; }
+  .brou-total-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; margin-top: 4px; border-top: 1.5px solid #1A3A5C; }
+  .brou-total-label { font-size: 13px; font-weight: 700; color: #1A3A5C; }
+  .brou-total-amount { font-size: 15px; font-weight: 700; color: #C0392B; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 3rem 1rem; color: #999; font-size: 14px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #EAF1FB; border-top-color: #1A3A5C; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error-box { background: #FDECEA; border-radius: 12px; padding: 1rem; text-align: center; color: #C0392B; font-size: 13px; margin: 1rem 0; }
+
+  /* Nav tabs */
+  .nav { display: flex; background: white; border-radius: 14px; padding: 4px; gap: 4px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .nav-btn { flex: 1; padding: 8px 4px; border: none; background: transparent; border-radius: 10px; font-size: 12px; font-weight: 500; color: #999; cursor: pointer; transition: all 0.2s; }
+  .nav-btn.active { background: #1A3A5C; color: white; }
+
+  /* Colores categorías */
+  .cat-super { background: #EAF1FB; }
+  .cat-comida { background: #FDECEA; }
+  .cat-compras { background: #F3E8FF; }
+  .cat-deporte { background: #E1F5EE; }
+  .cat-hogar { background: #FFF3E0; }
+  .cat-otros { background: #F5F5F5; }
+
+  .fill-super { background: #1A3A5C; }
+  .fill-comida { background: #C0392B; }
+  .fill-compras { background: #7C3AED; }
+  .fill-deporte { background: #0F6E56; }
+  .fill-hogar { background: #B7600A; }
+  .fill-otros { background: #888; }
+
+  .badge-super { background: #EAF1FB; color: #1A3A5C; }
+  .badge-comida { background: #FDECEA; color: #C0392B; }
+  .badge-compras { background: #F3E8FF; color: #7C3AED; }
+  .badge-deporte { background: #E1F5EE; color: #0F6E56; }
+  .badge-hogar { background: #FFF3E0; color: #B7600A; }
+  .badge-otros { background: #F5F5F5; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-title">Finanzas personales</div>
+      <div class="header-month" id="headerMonth">Cargando...</div>
+      <div class="header-update" id="headerUpdate">Actualizando...</div>
+    </div>
+    <button class="refresh-btn" onclick="cargarDatos()" title="Actualizar">↻</button>
+  </div>
+</div>
+
+<div class="content">
+  <div id="mainContent">
+    <div class="loading">
+      <div class="spinner"></div>
+      Cargando tus finanzas...
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = "1-Khddst-Y1y4O69h6R72c2X9Pa-wqctkE7aPjq-RTMs";
+const PRESUPUESTO = 50000;
+const DIA_CIERRE = 28;
+
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+const CAT_CONFIG = {
+  "Supermercado":   { emoji: "🛒", iconClass: "cat-super",   fillClass: "fill-super",   badgeClass: "badge-super"   },
+  "Comida trabajo": { emoji: "🥪", iconClass: "cat-comida",  fillClass: "fill-comida",  badgeClass: "badge-comida"  },
+  "Comida hogar":   { emoji: "🍽️", iconClass: "cat-comida",  fillClass: "fill-comida",  badgeClass: "badge-comida"  },
+  "Compras":        { emoji: "🛍️", iconClass: "cat-compras", fillClass: "fill-compras", badgeClass: "badge-compras" },
+  "Deporte":        { emoji: "⚽", iconClass: "cat-deporte", fillClass: "fill-deporte", badgeClass: "badge-deporte" },
+  "Hogar":          { emoji: "🏠", iconClass: "cat-hogar",   fillClass: "fill-hogar",   badgeClass: "badge-hogar"   },
+  "Mascotas":       { emoji: "🐾", iconClass: "cat-deporte", fillClass: "fill-deporte", badgeClass: "badge-deporte" },
+  "Salud":          { emoji: "💊", iconClass: "cat-hogar",   fillClass: "fill-hogar",   badgeClass: "badge-hogar"   },
+  "Streaming":      { emoji: "📺", iconClass: "cat-compras", fillClass: "fill-compras", badgeClass: "badge-compras" },
+  "Combustible":    { emoji: "⛽", iconClass: "cat-hogar",   fillClass: "fill-hogar",   badgeClass: "badge-hogar"   },
+  "Donaciones":     { emoji: "💙", iconClass: "cat-otros",   fillClass: "fill-otros",   badgeClass: "badge-otros"   },
+};
+
+function getCat(nombre) {
+  return CAT_CONFIG[nombre] || { emoji: "•", iconClass: "cat-otros", fillClass: "fill-otros", badgeClass: "badge-otros" };
+}
+
+async function fetchSheet(sheetName) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+  const res = await fetch(url);
+  const text = await res.text();
+  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+  const cols = json.table.cols.map(c => c.label);
+  const rows = json.table.rows.map(r => {
+    const obj = {};
+    r.c.forEach((cell, i) => { obj[cols[i]] = cell ? cell.v : null; });
+    return obj;
+  });
+  return rows;
+}
+
+function parseFecha(val) {
+  if (!val) return null;
+  if (typeof val === "string") {
+    const [d, m, y] = val.split(/[/ ]/);
+    return new Date(y, m - 1, d);
+  }
+  // Google Sheets devuelve Date(año,mes,dia) como string
+  const match = String(val).match(/Date\((\d+),(\d+),(\d+)/);
+  if (match) return new Date(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]));
+  return new Date(val);
+}
+
+function esMesActual(fecha) {
+  if (!fecha) return false;
+  const hoy = new Date();
+  return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
+}
+
+function fmt(n) {
+  return "$" + Math.round(n).toLocaleString("es-UY");
+}
+
+function diasRestantes() {
+  const hoy = new Date();
+  const cierre = new Date(hoy.getFullYear(), hoy.getMonth(), DIA_CIERRE);
+  if (hoy.getDate() > DIA_CIERRE) cierre.setMonth(cierre.getMonth() + 1);
+  const diff = Math.ceil((cierre - hoy) / (1000 * 60 * 60 * 24));
+  return diff;
+}
+
+async function cargarDatos() {
+  document.getElementById("mainContent").innerHTML = `<div class="loading"><div class="spinner"></div>Actualizando...</div>`;
+
+  try {
+    const [rowsSantander, rowsBROU, rowsIngresos] = await Promise.all([
+      fetchSheet("Santander"),
+      fetchSheet("Flujo de Caja BROU"),
+      fetchSheet("Ingresos")
+    ]);
+
+    const hoy = new Date();
+    document.getElementById("headerMonth").textContent = `${MESES[hoy.getMonth()]} ${hoy.getFullYear()}`;
+    document.getElementById("headerUpdate").textContent = `Actualizado ${hoy.toLocaleTimeString("es-UY", {hour:"2-digit",minute:"2-digit"})}`;
+
+    // ── SANTANDER este mes ───────────────────────────────────
+    const txSantander = rowsSantander.filter(r => {
+      const f = parseFecha(r["Fecha"]);
+      return f && esMesActual(f);
+    });
+
+    const totalSantander = txSantander.reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+    const pct = Math.min(100, Math.round(totalSantander / PRESUPUESTO * 100));
+    const disponible = PRESUPUESTO - totalSantander;
+    const dias = diasRestantes();
+    const promedioDisponible = dias > 0 ? disponible / dias : 0;
+
+    // Categorías Santander
+    const cats = {};
+    txSantander.forEach(r => {
+      const cat = r["Categoría"] || "Otros";
+      cats[cat] = (cats[cat] || 0) + (parseFloat(r["Monto"]) || 0);
+    });
+    const catsOrdenadas = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+    const maxCat = catsOrdenadas[0] ? catsOrdenadas[0][1] : 1;
+
+    // Alertas
+    const alertas = catsOrdenadas
+      .filter(([,m]) => m > 8000)
+      .map(([cat, monto]) => {
+        const p = Math.round(monto / PRESUPUESTO * 100);
+        return { cat, monto, pct: p };
+      });
+
+    // Últimos 5 movimientos Santander
+    const ultimos = [...txSantander]
+      .sort((a, b) => parseFecha(b["Fecha"]) - parseFecha(a["Fecha"]))
+      .slice(0, 5);
+
+    // ── BROU este mes ────────────────────────────────────────
+    const txBROU = rowsBROU.filter(r => {
+      const f = parseFecha(r["Fecha"]);
+      return f && esMesActual(f);
+    });
+
+    const totalBROU = txBROU
+      .filter(r => r["Moneda"] === "UYU" && r["Categoría"] !== "Movimiento interno")
+      .reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+
+    // Agrupar BROU por categoría
+    const brouGrupos = {};
+    txBROU.forEach(r => {
+      if (r["Categoría"] === "Movimiento interno") return;
+      const key = r["Subgrupo"] || r["Categoría"] || "Otros";
+      brouGrupos[key] = (brouGrupos[key] || 0) + (parseFloat(r["Monto"]) || 0);
+    });
+
+    // ── INGRESOS este mes ────────────────────────────────────
+    const totalIngresos = rowsIngresos
+      .filter(r => { const f = parseFecha(r["Fecha"]); return f && esMesActual(f); })
+      .reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+
+    const balance = totalIngresos - totalBROU;
+
+    // ── RENDER ───────────────────────────────────────────────
+    const fillClass = pct < 60 ? "progress-fill-ok" : pct < 85 ? "progress-fill-warn" : "progress-fill-danger";
+    const badgeClass = pct < 60 ? "badge-ok" : pct < 85 ? "badge-warn" : "badge-danger";
+    const badgeText = pct < 60 ? "En control" : pct < 85 ? "Atención" : "Al límite";
+
+    let html = `
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Ingresos del mes</div>
+        <div class="metric-value blue">${fmt(totalIngresos)}</div>
+        <div class="metric-sub">acreditados</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Egresos BROU</div>
+        <div class="metric-value red">${fmt(totalBROU)}</div>
+        <div class="metric-sub">pagos efectivos</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Balance estimado</div>
+        <div class="metric-value ${balance >= 0 ? "green" : "red"}">${balance >= 0 ? "+" : ""}${fmt(balance)}</div>
+        <div class="metric-sub">al cierre del mes</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Días al cierre</div>
+        <div class="metric-value blue">${dias}</div>
+        <div class="metric-sub">Santander cierra el ${DIA_CIERRE}</div>
+      </div>
+    </div>
+
+    <div class="santander-card">
+      <div class="card-header">
+        <div class="card-title">Santander</div>
+        <span class="card-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="progress-main">
+        <div class="progress-spent">${fmt(totalSantander)}</div>
+        <div class="progress-total">de ${fmt(PRESUPUESTO)}</div>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill ${fillClass}" style="width:${pct}%"></div>
+      </div>
+      <div class="progress-info">
+        <span>${pct}% del presupuesto</span>
+        <span>${fmt(disponible)} disponibles · ${fmt(promedioDisponible)}/día</span>
+      </div>
+    </div>`;
+
+    if (alertas.length > 0) {
+      alertas.forEach(a => {
+        const cls = a.pct > 30 ? "alerta-danger" : "alerta-warn";
+        const icon = a.pct > 30 ? "⚠️" : "📊";
+        html += `<div class="alerta ${cls}"><span class="alerta-icon">${icon}</span>${a.cat}: ${fmt(a.monto)} — ${a.pct}% del presupuesto mensual</div>`;
+      });
+    }
+
+    if (catsOrdenadas.length > 0) {
+      html += `<div class="card"><div class="card-header"><div class="card-title">Por categoría</div></div>`;
+      catsOrdenadas.forEach(([cat, monto]) => {
+        const c = getCat(cat);
+        const barPct = Math.round(monto / maxCat * 100);
+        html += `
+        <div class="cat-row">
+          <div class="cat-icon ${c.iconClass}">${c.emoji}</div>
+          <div class="cat-info">
+            <div class="cat-name">${cat}</div>
+            <div class="cat-bar-bg"><div class="cat-bar-fill ${c.fillClass}" style="width:${barPct}%"></div></div>
+          </div>
+          <div class="cat-amount">${fmt(monto)}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (ultimos.length > 0) {
+      html += `<div class="card"><div class="card-header"><div class="card-title">Últimos movimientos</div></div>`;
+      ultimos.forEach(r => {
+        const cat = r["Categoría"] || "Otros";
+        const c = getCat(cat);
+        const fecha = parseFecha(r["Fecha"]);
+        const fechaStr = fecha ? `${fecha.getDate()} ${MESES[fecha.getMonth()].substring(0,3).toLowerCase()}` : "";
+        html += `
+        <div class="tx-row">
+          <div class="tx-left">
+            <div class="tx-name">${r["Descripción"] || "-"}</div>
+            <div class="tx-meta">
+              <span class="tx-date">${fechaStr}</span>
+              <span class="tx-badge ${c.badgeClass}">${cat}</span>
+            </div>
+          </div>
+          <div class="tx-amount">${fmt(parseFloat(r["Monto"]) || 0)}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // BROU detalle
+    const brouEntradas = Object.entries(brouGrupos).sort((a, b) => b[1] - a[1]);
+    if (brouEntradas.length > 0) {
+      html += `<div class="card"><div class="card-header"><div class="card-title">Flujo de caja BROU — ${MESES[hoy.getMonth()]}</div></div>`;
+      brouEntradas.forEach(([label, monto]) => {
+        html += `<div class="brou-row"><span class="brou-label">${label}</span><span class="brou-amount">${fmt(monto)}</span></div>`;
+      });
+      html += `<div class="brou-total-row"><span class="brou-total-label">Total egresos</span><span class="brou-total-amount">${fmt(totalBROU)}</span></div>`;
+      html += `</div>`;
+    }
+
+    document.getElementById("mainContent").innerHTML = html;
+
+  } catch (err) {
+    document.getElementById("mainContent").innerHTML = `
+      <div class="error-box">
+        <div style="font-size:24px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:600;margin-bottom:4px">Error al cargar los datos</div>
+        <div style="font-size:12px;opacity:0.8">${err.message}</div>
+        <button onclick="cargarDatos()" style="margin-top:12px;padding:8px 20px;background:#C0392B;color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer">Reintentar</button>
+      </div>`;
+  }
+}
+
+cargarDatos();
+</script>
+</body>
+</html>
