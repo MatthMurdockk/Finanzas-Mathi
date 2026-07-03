@@ -423,9 +423,22 @@ async function cargarDatos() {
       return f && esMesActual(f);
     });
 
-    const totalSantander = txSantander.reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+    // Total consumido y presupuesto restante: usamos los que ya calcula la planilla
+    // (columna K), porque tienen en cuenta cuotas y el cierre del día 28.
+    // Si por algún motivo esa fila de totales no está, calculamos un respaldo simple.
+    const filaTotalSantander = rowsSantander.find(r => String(r["Descripción"] || "").includes("TOTAL CONSUMIDO"));
+    const filaPresupuestoRestante = rowsSantander.find(r => String(r["Descripción"] || "").includes("PRESUPUESTO RESTANTE"));
+
+    let totalSantander, disponible;
+    if (filaTotalSantander && filaPresupuestoRestante) {
+      totalSantander = parseFloat(filaTotalSantander["K"]) || 0;
+      disponible = parseFloat(filaPresupuestoRestante["K"]) || 0;
+    } else {
+      DEBUG.general.push('No encontré la fila "TOTAL CONSUMIDO MES ACTUAL" / "PRESUPUESTO RESTANTE" en Santander. Usando cálculo de respaldo (no contempla cuotas correctamente). Corré "Leer mails ahora" o "Aplicar formato a las hojas" desde el menú 💰 Finanzas para regenerarla.');
+      totalSantander = txSantander.reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+      disponible = PRESUPUESTO - totalSantander;
+    }
     const pct = Math.min(100, Math.round(totalSantander / PRESUPUESTO * 100));
-    const disponible = PRESUPUESTO - totalSantander;
     const dias = diasRestantes();
     const promedioDisponible = dias > 0 ? disponible / dias : 0;
 
