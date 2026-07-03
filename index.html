@@ -363,12 +363,18 @@ function renderDebugPanel() {
 function parseFecha(val) {
   if (!val) return null;
   if (typeof val === "string") {
-    const [d, m, y] = val.split(/[/ ]/);
-    return new Date(y, m - 1, d);
+    // Formato que devuelve Google Sheets (gviz): "Date(año,mes,dia,hora,min,seg)"
+    const match = val.match(/^Date\((\d+),(\d+),(\d+)/);
+    if (match) return new Date(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]));
+    // Formato de texto escrito a mano, ej: "01/07/2026"
+    const partes = val.split(/[/ ]/);
+    if (partes.length >= 3) {
+      const [d, m, y] = partes;
+      const fecha = new Date(y, m - 1, d);
+      if (!isNaN(fecha.getTime())) return fecha;
+    }
+    return null;
   }
-  // Google Sheets devuelve Date(año,mes,dia) como string
-  const match = String(val).match(/Date\((\d+),(\d+),(\d+)/);
-  if (match) return new Date(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]));
   return new Date(val);
 }
 
