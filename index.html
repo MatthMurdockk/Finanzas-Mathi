@@ -158,6 +158,38 @@
   /* Error */
   .error-box { background: #FDECEA; border-radius: 12px; padding: 1rem; text-align: center; color: #C0392B; font-size: 13px; margin: 1rem 0; }
 
+  /* Debug */
+  .debug-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 8px;
+  }
+  .debug-btn:active { background: rgba(255,255,255,0.25); }
+  .header-actions { display: flex; align-items: center; }
+  .debug-panel {
+    background: #1A1A1A;
+    color: #7CFFB2;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    font-size: 11px;
+    font-family: "SF Mono", Menlo, monospace;
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  .debug-panel .debug-title { color: #fff; font-weight: 700; margin-bottom: 6px; }
+  .debug-panel .debug-warn { color: #FFB74D; }
+  .debug-panel .debug-err { color: #FF6B6B; }
+
   /* Nav tabs */
   .nav { display: flex; background: white; border-radius: 14px; padding: 4px; gap: 4px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
   .nav-btn { flex: 1; padding: 8px 4px; border: none; background: transparent; border-radius: 10px; font-size: 12px; font-weight: 500; color: #999; cursor: pointer; transition: all 0.2s; }
@@ -195,11 +227,15 @@
       <div class="header-month" id="headerMonth">Cargando...</div>
       <div class="header-update" id="headerUpdate">Actualizando...</div>
     </div>
-    <button class="refresh-btn" onclick="cargarDatos()" title="Actualizar">↻</button>
+    <div class="header-actions">
+      <button class="debug-btn" onclick="toggleDebug()" title="Diagnóstico">🔧</button>
+      <button class="refresh-btn" onclick="cargarDatos()" title="Actualizar">↻</button>
+    </div>
   </div>
 </div>
 
 <div class="content">
+  <div id="debugPanelWrap"></div>
   <div id="mainContent">
     <div class="loading">
       <div class="spinner"></div>
@@ -233,18 +269,92 @@ function getCat(nombre) {
   return CAT_CONFIG[nombre] || { emoji: "•", iconClass: "cat-otros", fillClass: "fill-otros", badgeClass: "badge-otros" };
 }
 
+const DEBUG = { sheets: {}, general: [] };
+
 async function fetchSheet(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-  const res = await fetch(url);
-  const text = await res.text();
-  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-  const cols = json.table.cols.map(c => c.label);
-  const rows = json.table.rows.map(r => {
-    const obj = {};
-    r.c.forEach((cell, i) => { obj[cols[i]] = cell ? cell.v : null; });
-    return obj;
+  const info = { nombre: sheetName, ok: false, columnas: [], filas: 0, filasMesActual: 0, muestra: null, error: null };
+  DEBUG.sheets[sheetName] = info;
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+    const res = await fetch(url);
+    const text = await res.text();
+
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) {
+      // Google devuelve HTML de error (login / pestaña inexistente) en vez de JSON
+      if (text.includes("Invalid query") || text.includes("does not have a sheet") || text.trim().startsWith("<")) {
+        info.error = `No se encontró la pestaña "${sheetName}" en la planilla (o cambió de nombre), o la planilla no está compartida como "Cualquier usuario con el enlace".`;
+      } else {
+        info.error = "Respuesta inesperada de Google Sheets (no es el formato JSON esperado).";
+      }
+      return [];
+    }
+
+    const json = JSON.parse(match[1]);
+
+    if (json.status === "error") {
+      const msg = (json.errors && json.errors[0] && json.errors[0].detailed_message) || "Error desconocido de Google Sheets";
+      info.error = `Google Sheets devolvió un error para "${sheetName}": ${msg}`;
+      return [];
+    }
+
+    const cols = json.table.cols.map(c => c.label || c.id || "(sin nombre)");
+    const rows = json.table.rows.map(r => {
+      const obj = {};
+      r.c.forEach((cell, i) => { obj[cols[i]] = cell ? cell.v : null; });
+      return obj;
+    });
+
+    info.ok = true;
+    info.columnas = cols;
+    info.filas = rows.length;
+    info.muestra = rows[0] || null;
+    if (rows.length === 0) {
+      info.error = `La pestaña "${sheetName}" se encontró pero no tiene filas de datos.`;
+    }
+    return rows;
+  } catch (err) {
+    info.error = `Fallo al conectar con "${sheetName}": ${err.message}`;
+    return [];
+  }
+}
+
+function toggleDebug() {
+  const wrap = document.getElementById("debugPanelWrap");
+  wrap.dataset.open = wrap.dataset.open === "1" ? "0" : "1";
+  renderDebugPanel();
+}
+
+function renderDebugPanel() {
+  const wrap = document.getElementById("debugPanelWrap");
+  if (wrap.dataset.open !== "1") { wrap.innerHTML = ""; return; }
+
+  let out = `<div class="debug-panel"><div class="debug-title">🔧 Diagnóstico de datos</div>`;
+  const hoy = new Date();
+  out += `Fecha/hora actual del dispositivo: ${hoy.toString()}\n\n`;
+
+  Object.values(DEBUG.sheets).forEach(s => {
+    out += `— Pestaña: "${s.nombre}"\n`;
+    if (s.error) {
+      out += `  <span class="debug-err">✗ ${s.error}</span>\n`;
+    }
+    if (s.ok) {
+      out += `  <span class="${s.filas === 0 ? 'debug-warn' : ''}">✓ Encontrada · ${s.filas} filas</span>\n`;
+      out += `  Columnas detectadas: ${s.columnas.join(", ")}\n`;
+      if (s.muestra) {
+        out += `  Primera fila de ejemplo: ${JSON.stringify(s.muestra)}\n`;
+      }
+    }
+    out += `\n`;
   });
-  return rows;
+
+  if (DEBUG.general.length > 0) {
+    out += `Otros avisos:\n`;
+    DEBUG.general.forEach(g => out += `  <span class="debug-warn">⚠ ${g}</span>\n`);
+  }
+
+  out += `</div>`;
+  wrap.innerHTML = out;
 }
 
 function parseFecha(val) {
@@ -277,8 +387,20 @@ function diasRestantes() {
   return diff;
 }
 
+function chequearColumnas(nombreHoja, columnasEsperadas) {
+  const info = DEBUG.sheets[nombreHoja];
+  if (!info || !info.ok) return;
+  columnasEsperadas.forEach(col => {
+    if (!info.columnas.includes(col)) {
+      DEBUG.general.push(`En "${nombreHoja}" no se encontró la columna "${col}". Columnas actuales: ${info.columnas.join(", ")}`);
+    }
+  });
+}
+
 async function cargarDatos() {
   document.getElementById("mainContent").innerHTML = `<div class="loading"><div class="spinner"></div>Actualizando...</div>`;
+  DEBUG.sheets = {};
+  DEBUG.general = [];
 
   try {
     const [rowsSantander, rowsBROU, rowsIngresos] = await Promise.all([
@@ -286,6 +408,10 @@ async function cargarDatos() {
       fetchSheet("Flujo de Caja BROU"),
       fetchSheet("Ingresos")
     ]);
+
+    chequearColumnas("Santander", ["Fecha", "Monto", "Categoría", "Descripción"]);
+    chequearColumnas("Flujo de Caja BROU", ["Fecha", "Monto", "Moneda", "Categoría"]);
+    chequearColumnas("Ingresos", ["Fecha", "Monto"]);
 
     const hoy = new Date();
     document.getElementById("headerMonth").textContent = `${MESES[hoy.getMonth()]} ${hoy.getFullYear()}`;
@@ -457,6 +583,7 @@ async function cargarDatos() {
     }
 
     document.getElementById("mainContent").innerHTML = html;
+    renderDebugPanel();
 
   } catch (err) {
     document.getElementById("mainContent").innerHTML = `
@@ -466,6 +593,8 @@ async function cargarDatos() {
         <div style="font-size:12px;opacity:0.8">${err.message}</div>
         <button onclick="cargarDatos()" style="margin-top:12px;padding:8px 20px;background:#C0392B;color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer">Reintentar</button>
       </div>`;
+    DEBUG.general.push(`Error general no capturado: ${err.message}`);
+    renderDebugPanel();
   }
 }
 
