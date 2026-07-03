@@ -298,7 +298,7 @@ async function fetchSheet(sheetName) {
       return [];
     }
 
-    const cols = json.table.cols.map(c => c.label || c.id || "(sin nombre)");
+    const cols = json.table.cols.map(c => (c.label || c.id || "(sin nombre)").trim());
     const rows = json.table.rows.map(r => {
       const obj = {};
       r.c.forEach((cell, i) => { obj[cols[i]] = cell ? cell.v : null; });
