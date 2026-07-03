@@ -339,10 +339,13 @@ function renderDebugPanel() {
       out += `  <span class="debug-err">✗ ${s.error}</span>\n`;
     }
     if (s.ok) {
-      out += `  <span class="${s.filas === 0 ? 'debug-warn' : ''}">✓ Encontrada · ${s.filas} filas</span>\n`;
+      out += `  <span class="${s.filas === 0 ? 'debug-warn' : ''}">✓ Encontrada · ${s.filas} filas totales · ${s.filasMesActual} del mes actual</span>\n`;
       out += `  Columnas detectadas: ${s.columnas.join(", ")}\n`;
       if (s.muestra) {
         out += `  Primera fila de ejemplo: ${JSON.stringify(s.muestra)}\n`;
+      }
+      if (s.filasMesActual > 0 && s.muestraMesActual) {
+        out += `  Ejemplo de fila DEL MES ACTUAL: ${JSON.stringify(s.muestraMesActual)}\n`;
       }
     }
     out += `\n`;
@@ -373,6 +376,21 @@ function esMesActual(fecha) {
   if (!fecha) return false;
   const hoy = new Date();
   return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
+}
+
+// Replica la lógica de la planilla: una cuota de Santander pertenece al ciclo actual
+// si el mes de inicio (columna "Mes") es <= al ciclo de hoy y el vencimiento
+// (columna "Vencimiento cuota") es >= al ciclo de hoy. Así una compra en cuotas
+// de mayo puede seguir "activa" en el ciclo de julio.
+function enCicloActualSantander(r) {
+  const mesIni = parseFecha(r["Mes"]);
+  const mesFin = parseFecha(r["Vencimiento cuota"]);
+  if (!mesIni || !mesFin) return false;
+  const hoy = new Date();
+  const cicloHoy = hoy.getFullYear() * 12 + hoy.getMonth();
+  const cicloIni = mesIni.getFullYear() * 12 + mesIni.getMonth();
+  const cicloFin = mesFin.getFullYear() * 12 + mesFin.getMonth();
+  return cicloIni <= cicloHoy && cicloFin >= cicloHoy;
 }
 
 function fmt(n) {
@@ -417,11 +435,18 @@ async function cargarDatos() {
     document.getElementById("headerMonth").textContent = `${MESES[hoy.getMonth()]} ${hoy.getFullYear()}`;
     document.getElementById("headerUpdate").textContent = `Actualizado ${hoy.toLocaleTimeString("es-UY", {hour:"2-digit",minute:"2-digit"})}`;
 
-    // ── SANTANDER este mes ───────────────────────────────────
-    const txSantander = rowsSantander.filter(r => {
-      const f = parseFecha(r["Fecha"]);
-      return f && esMesActual(f);
-    });
+    // ── SANTANDER este mes (por ciclo de facturación, no por fecha de compra) ──
+    const txSantander = rowsSantander.filter(r => r["Fecha"] && enCicloActualSantander(r));
+    if (DEBUG.sheets["Santander"]) {
+      DEBUG.sheets["Santander"].filasMesActual = txSantander.length;
+      DEBUG.sheets["Santander"].muestraMesActual = txSantander[0] || null;
+    }
+
+    // Monto que corresponde a este ciclo: "Monto x cuota" si existe, si no "Monto"
+    const montoCiclo = r => {
+      const m = parseFloat(r["Monto x cuota"]);
+      return !isNaN(m) ? m : (parseFloat(r["Monto"]) || 0);
+    };
 
     // Total consumido y presupuesto restante: usamos los que ya calcula la planilla
     // (columna K), porque tienen en cuenta cuotas y el cierre del día 28.
@@ -435,7 +460,7 @@ async function cargarDatos() {
       disponible = parseFloat(filaPresupuestoRestante["K"]) || 0;
     } else {
       DEBUG.general.push('No encontré la fila "TOTAL CONSUMIDO MES ACTUAL" / "PRESUPUESTO RESTANTE" en Santander. Usando cálculo de respaldo (no contempla cuotas correctamente). Corré "Leer mails ahora" o "Aplicar formato a las hojas" desde el menú 💰 Finanzas para regenerarla.');
-      totalSantander = txSantander.reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
+      totalSantander = txSantander.reduce((s, r) => s + montoCiclo(r), 0);
       disponible = PRESUPUESTO - totalSantander;
     }
     const pct = Math.min(100, Math.round(totalSantander / PRESUPUESTO * 100));
@@ -446,7 +471,7 @@ async function cargarDatos() {
     const cats = {};
     txSantander.forEach(r => {
       const cat = r["Categoría"] || "Otros";
-      cats[cat] = (cats[cat] || 0) + (parseFloat(r["Monto"]) || 0);
+      cats[cat] = (cats[cat] || 0) + montoCiclo(r);
     });
     const catsOrdenadas = Object.entries(cats).sort((a, b) => b[1] - a[1]);
     const maxCat = catsOrdenadas[0] ? catsOrdenadas[0][1] : 1;
@@ -469,6 +494,10 @@ async function cargarDatos() {
       const f = parseFecha(r["Fecha"]);
       return f && esMesActual(f);
     });
+    if (DEBUG.sheets["Flujo de Caja BROU"]) {
+      DEBUG.sheets["Flujo de Caja BROU"].filasMesActual = txBROU.length;
+      DEBUG.sheets["Flujo de Caja BROU"].muestraMesActual = txBROU[0] || null;
+    }
 
     const totalBROU = txBROU
       .filter(r => r["Moneda"] === "UYU" && r["Categoría"] !== "Movimiento interno")
@@ -483,8 +512,12 @@ async function cargarDatos() {
     });
 
     // ── INGRESOS este mes ────────────────────────────────────
-    const totalIngresos = rowsIngresos
-      .filter(r => { const f = parseFecha(r["Fecha"]); return f && esMesActual(f); })
+    const txIngresos = rowsIngresos.filter(r => { const f = parseFecha(r["Fecha"]); return f && esMesActual(f); });
+    if (DEBUG.sheets["Ingresos"]) {
+      DEBUG.sheets["Ingresos"].filasMesActual = txIngresos.length;
+      DEBUG.sheets["Ingresos"].muestraMesActual = txIngresos[0] || null;
+    }
+    const totalIngresos = txIngresos
       .reduce((s, r) => s + (parseFloat(r["Monto"]) || 0), 0);
 
     const balance = totalIngresos - totalBROU;
@@ -578,7 +611,7 @@ async function cargarDatos() {
               <span class="tx-badge ${c.badgeClass}">${cat}</span>
             </div>
           </div>
-          <div class="tx-amount">${fmt(parseFloat(r["Monto"]) || 0)}</div>
+          <div class="tx-amount">${fmt(montoCiclo(r))}</div>
         </div>`;
       });
       html += `</div>`;
@@ -615,3 +648,4 @@ cargarDatos();
 </script>
 </body>
 </html>
+
